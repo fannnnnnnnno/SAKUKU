@@ -1,0 +1,46 @@
+@import "tailwindcss";
+
+@theme {
+  /* Primary (Green) - dari design SAKUKU */
+  --color-primary: #006E08;
+  --color-primary-container: #00AA13;
+  --color-on-primary: #FFFFFF;
+  --color-on-primary-container: #003402;
+
+  /* Secondary */
+  --color-secondary: #006E2A;
+  --color-secondary-container: #5CFD80;
+
+  /* Danger / Expense (Red) */
+  --color-error: #BA1A1A;
+  --color-error-container: #FFDAD6;
+  --color-on-error-container: #93000A;
+
+  /* Surface */
+  --color-surface: #FCF9F8;
+  --color-surface-lowest: #FFFFFF;
+  --color-surface-low: #F6F3F2;
+  --color-surface-container: #F0EDED;
+  --color-surface-high: #EAE7E7;
+  --color-surface-highest: #E5E2E1;
+
+  /* Text */
+  --color-on-surface: #1C1B1B;
+  --color-on-surface-variant: #3E4A39;
+  --color-outline: #6D7B67;
+  --color-outline-variant: #BCCBB4;
+
+  /* Semantic */
+  --color-income: #00AA13;
+  --color-expense: #BA1A1A;
+
+  --font-sans: "Inter", system-ui, sans-serif;
+
+  --radius-card: 16px;
+  --radius-full: 9999px;
+}
+
+body {
+  background-color: var(--color-surface);
+  color: var(--color-on-surface);
+}
