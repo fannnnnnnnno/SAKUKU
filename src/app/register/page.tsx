@@ -1,12 +1,27 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { registerUser } from "@/lib/actions/auth";
 import Link from "next/link";
 import { Wallet, User, Mail, Lock, ArrowRight, Loader2 } from "lucide-react";
 
 export default function RegisterPage() {
   const [state, formAction, isPending] = useActionState(registerUser, null);
+  const router = useRouter();
+  const { status } = useSession();
+
+  useEffect(() => {
+    if (status === "authenticated") {
+      router.replace("/transaksi");
+      return;
+    }
+
+    if (state?.success) {
+      router.replace("/transaksi");
+    }
+  }, [router, state?.success, status]);
 
   return (
     <main className="min-h-screen bg-surface flex items-center justify-center p-5">

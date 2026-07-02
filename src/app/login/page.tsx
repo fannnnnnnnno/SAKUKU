@@ -1,12 +1,30 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { loginUser } from "@/lib/actions/auth";
 import Link from "next/link";
 import { Wallet, Mail, Lock, ArrowRight, Loader2 } from "lucide-react";
 
 export default function LoginPage() {
   const [state, formAction, isPending] = useActionState(loginUser, null);
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { status } = useSession();
+
+  useEffect(() => {
+    if (status === "authenticated") {
+      const callbackUrl = searchParams.get("callbackUrl") || "/transaksi";
+      router.replace(callbackUrl);
+      return;
+    }
+
+    if (state?.success) {
+      const callbackUrl = searchParams.get("callbackUrl") || "/transaksi";
+      router.replace(callbackUrl);
+    }
+  }, [router, searchParams, state?.success, status]);
 
   return (
     <main className="min-h-screen bg-surface flex items-center justify-center p-5">

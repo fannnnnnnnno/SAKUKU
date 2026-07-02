@@ -1,7 +1,6 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
 import {
   ArrowLeft,
   ChevronRight,
@@ -10,29 +9,14 @@ import {
   Database,
   Info,
   Globe,
-  Trash2,
   User,
   LogOut,
 } from "lucide-react";
 import { BottomNav } from "@/components/BottomNav";
 import { signOut } from "next-auth/react";
-import { resetUserData } from "@/lib/actions/transactions";
 
 export default function PengaturanScreen() {
   const router = useRouter();
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [isResetting, setIsResetting] = useState(false);
-
-  const handleReset = async () => {
-    setIsResetting(true);
-    try {
-      await resetUserData();
-      window.location.href = "/";
-    } catch (err) {
-      console.error("Gagal mereset data:", err);
-      setIsResetting(false);
-    }
-  };
 
   const menuItems = [
     { icon: Tag, label: "Kategori", href: "/kategori" },
@@ -91,51 +75,12 @@ export default function PengaturanScreen() {
       {/* Sign Out */}
       <div className="px-5 mt-4">
         <button
-          onClick={() => signOut({ callbackUrl: "/login" })}
+          onClick={() => signOut({ callbackUrl: "/" })}
           className="w-full bg-surface-lowest border border-outline text-on-surface hover:bg-surface-container/50 font-semibold py-3.5 rounded-full flex items-center justify-center gap-2 text-sm shadow-sm"
         >
           <LogOut size={16} />
           Keluar dari Akun
         </button>
-      </div>
-
-      {/* Reset Data */}
-      <div className="px-5 mt-5">
-        {!showConfirm ? (
-          <button
-            onClick={() => setShowConfirm(true)}
-            className="w-full border-2 border-error text-error font-semibold py-3 rounded-full flex items-center justify-center gap-2"
-          >
-            <Trash2 size={18} />
-            Reset Semua Data
-          </button>
-        ) : (
-          <div className="bg-error-container rounded-card p-4">
-            <p className="text-sm text-on-error-container font-medium mb-3 text-center">
-              Yakin ingin menghapus semua data? Tindakan ini tidak dapat dibatalkan.
-            </p>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowConfirm(false)}
-                disabled={isResetting}
-                className="flex-1 py-2.5 rounded-full border border-outline-variant text-sm font-medium bg-surface-lowest"
-              >
-                Batal
-              </button>
-              <button
-                onClick={handleReset}
-                disabled={isResetting}
-                className="flex-1 py-2.5 rounded-full bg-error text-white text-sm font-medium disabled:opacity-50"
-              >
-                {isResetting ? "Mereset..." : "Ya, Hapus"}
-              </button>
-            </div>
-          </div>
-        )}
-        <p className="text-xs text-on-surface-variant text-center mt-3 px-4">
-          Tindakan ini tidak dapat dibatalkan. Pastikan Anda telah mencadangkan data
-          Anda.
-        </p>
       </div>
 
       <BottomNav />

@@ -4,6 +4,7 @@ import "./globals.css";
 import { DataProvider } from "@/components/DataProvider";
 import { Sidebar } from "@/components/Sidebar";
 import { SessionProvider } from "next-auth/react";
+import { auth } from "@/auth";
 
 const inter = localFont({
   src: "../../public/fonts/Inter-Variable.ttf",
@@ -23,21 +24,27 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
+  viewportFit: "cover",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await auth();
+  const isAuthenticated = !!session?.user;
+
   return (
-    <html lang="id">
-      <body className={`${inter.variable} font-sans antialiased`}>
+    <html lang="id" className="h-full">
+      <body className={`${inter.variable} font-sans antialiased min-h-screen h-full bg-surface text-on-surface`}>
         <SessionProvider>
           <DataProvider>
-            <Sidebar />
-            <div className="md:pl-60">
-              <div className="max-w-md md:max-w-4xl mx-auto relative">{children}</div>
+            {isAuthenticated && <Sidebar />}
+            <div className={isAuthenticated ? "md:pl-60" : ""}>
+              <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-0 sm:px-4 md:px-6 lg:px-8">
+                <div className="relative flex-1">{children}</div>
+              </div>
             </div>
           </DataProvider>
         </SessionProvider>

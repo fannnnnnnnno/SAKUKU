@@ -11,6 +11,7 @@ import { useTransactionStore } from "@/store/transactionStore";
 interface CategoryState {
   categories: Category[];
   isLoading: boolean;
+  reset: () => void;
   loadCategories: () => Promise<void>;
   addCategory: (cat: Omit<Category, "id">) => Promise<void>;
   updateCategory: (id: string, cat: Partial<Category>) => Promise<void>;
@@ -21,6 +22,8 @@ interface CategoryState {
 export const useCategoryStore = create<CategoryState>((set, get) => ({
   categories: [],
   isLoading: false,
+
+  reset: () => set({ categories: [], isLoading: false }),
 
   loadCategories: async () => {
     set({ isLoading: true });

@@ -4,6 +4,32 @@ import prisma from "@/lib/prisma";
 import { auth } from "@/auth";
 import type { Category } from "@/types";
 
+function normalizeCategoryPayload(cat: Partial<Category> | { name?: string; icon?: string; color?: string; monthlyLimit?: number | null }) {
+  const name = typeof cat.name === "string" ? cat.name.trim() : "";
+  if (!name) {
+    throw new Error("Nama kategori wajib diisi");
+  }
+
+  const icon = typeof cat.icon === "string" && cat.icon.trim() ? cat.icon.trim() : "Circle";
+  const color = typeof cat.color === "string" && cat.color.trim() ? cat.color.trim() : "#A8A8A8";
+  const monthlyLimit = typeof cat.monthlyLimit === "number"
+    ? cat.monthlyLimit
+    : cat.monthlyLimit !== undefined && cat.monthlyLimit !== null
+      ? Number(cat.monthlyLimit)
+      : undefined;
+
+  if (monthlyLimit !== undefined && (!Number.isFinite(monthlyLimit) || monthlyLimit < 0)) {
+    throw new Error("Batas bulanan tidak valid");
+  }
+
+  return {
+    name,
+    icon,
+    color,
+    monthlyLimit: monthlyLimit ?? null,
+  };
+}
+
 export async function getCategories(): Promise<Category[]> {
   const session = await auth();
   if (!session?.user?.id) return [];
@@ -26,13 +52,22 @@ export async function createCategory(cat: Omit<Category, "id">) {
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
+  const payload = normalizeCategoryPayload(cat);
+  const existing = await prisma.category.findFirst({
+    where: { userId: session.user.id, name: payload.name },
+  });
+
+  if (existing) {
+    throw new Error("Kategori sudah ada");
+  }
+
   return prisma.category.create({
     data: {
       userId: session.user.id,
-      name: cat.name,
-      icon: cat.icon,
-      color: cat.color,
-      monthlyLimit: cat.monthlyLimit,
+      name: payload.name,
+      icon: payload.icon,
+      color: payload.color,
+      monthlyLimit: payload.monthlyLimit,
     },
   });
 }
@@ -46,13 +81,30 @@ export async function updateCategoryAction(id: string, cat: Partial<Category>) {
   });
   if (!existing) throw new Error("Not found");
 
+  const payload = normalizeCategoryPayload({
+    ...existing,
+    ...cat,
+  });
+
+  const duplicate = await prisma.category.findFirst({
+    where: {
+      userId: session.user.id,
+      name: payload.name,
+      NOT: { id },
+    },
+  });
+
+  if (duplicate) {
+    throw new Error("Kategori sudah ada");
+  }
+
   return prisma.category.update({
     where: { id },
     data: {
-      name: cat.name,
-      icon: cat.icon,
-      color: cat.color,
-      monthlyLimit: cat.monthlyLimit,
+      name: payload.name,
+      icon: payload.icon,
+      color: payload.color,
+      monthlyLimit: payload.monthlyLimit,
     },
   });
 }

@@ -16,17 +16,13 @@ export function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-surface-lowest border-t border-surface-high px-2 py-2 flex items-center justify-around max-w-md mx-auto z-20">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-surface-lowest border-t border-surface-high px-2 py-2 flex items-center justify-around z-20">
       {navItems.map(({ href, label, icon: Icon, isCenter }) => {
         const isActive = pathname === href;
 
         if (isCenter) {
           return (
-            <Link
-              key={href}
-              href={href}
-              className="flex flex-col items-center -mt-6"
-            >
+            <Link key={href} href={href} className="flex flex-col items-center -mt-6">
               <div
                 className={`w-14 h-14 rounded-full flex items-center justify-center shadow-lg ${
                   isActive ? "bg-primary" : "bg-primary-container"
@@ -39,20 +35,12 @@ export function BottomNav() {
         }
 
         return (
-          <Link
-            key={href}
-            href={href}
-            className="flex flex-col items-center gap-1 px-3 py-1"
-          >
+          <Link key={href} href={href} className="flex flex-col items-center gap-1 px-3 py-1">
             <Icon
               size={22}
               color={isActive ? "var(--color-primary)" : "var(--color-outline)"}
             />
-            <span
-              className={`text-xs ${
-                isActive ? "text-primary font-medium" : "text-outline"
-              }`}
-            >
+            <span className={`text-xs ${isActive ? "text-primary font-medium" : "text-outline"}`}>
               {label}
             </span>
           </Link>

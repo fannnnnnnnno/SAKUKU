@@ -2,27 +2,33 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Pencil, Trash2 } from "lucide-react";
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { useTransactionStore } from "@/store/transactionStore";
 import { useCategoryStore } from "@/store/categoryStore";
 import { formatRupiah, formatMonthYear, getMonthRange } from "@/lib/formatters";
 import { BottomNav } from "@/components/BottomNav";
-import type { TransactionType } from "@/types";
+import type { Transaction, TransactionType } from "@/types";
 
 export default function LaporanScreen() {
   const router = useRouter();
   const transactions = useTransactionStore((s) => s.transactions);
+  const updateTransaction = useTransactionStore((s) => s.updateTransaction);
+  const deleteTransaction = useTransactionStore((s) => s.deleteTransaction);
   const categories = useCategoryStore((s) => s.categories);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [activeTab, setActiveTab] = useState<TransactionType>("expense");
+  const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState({ amount: "", note: "", date: "", categoryId: "" });
 
-  const { breakdown, total } = useMemo(() => {
+  const { breakdown, total, monthlyTransactions } = useMemo(() => {
     const { start, end } = getMonthRange(currentMonth);
     const filtered = transactions.filter((t) => {
       const d = new Date(t.date);
       return t.type === activeTab && d >= start && d <= end;
     });
+
+    const monthlyTransactions = [...filtered].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     const byCategory: Record<string, number> = {};
     for (const tx of filtered) {
@@ -43,8 +49,46 @@ export default function LaporanScreen() {
       })
       .sort((a, b) => b.value - a.value);
 
-    return { breakdown, total };
+    return { breakdown, total, monthlyTransactions };
   }, [transactions, categories, currentMonth, activeTab]);
+
+  const startEdit = (tx: Transaction) => {
+    setEditingTransactionId(tx.id);
+    setEditForm({
+      amount: tx.amount.toString(),
+      note: tx.note || "",
+      date: new Date(tx.date).toISOString().slice(0, 10),
+      categoryId: tx.categoryId,
+    });
+  };
+
+  const cancelEdit = () => {
+    setEditingTransactionId(null);
+    setEditForm({ amount: "", note: "", date: "", categoryId: "" });
+  };
+
+  const saveEdit = async () => {
+    if (!editingTransactionId) return;
+
+    const amount = Number(editForm.amount);
+    if (!editForm.date || Number.isNaN(amount) || amount <= 0 || !editForm.categoryId) {
+      return;
+    }
+
+    await updateTransaction(editingTransactionId, {
+      amount,
+      note: editForm.note,
+      date: new Date(editForm.date).toISOString(),
+      categoryId: editForm.categoryId,
+    });
+
+    cancelEdit();
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm("Hapus transaksi ini?")) return;
+    await deleteTransaction(id);
+  };
 
   const changeMonth = (delta: number) => {
     const next = new Date(currentMonth);
@@ -165,6 +209,130 @@ export default function LaporanScreen() {
             </div>
           </div>
         )}
+
+        <div className="mt-6 bg-surface-lowest rounded-card p-5 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-bold text-on-surface">Transaksi Bulan Ini</h3>
+            <span className="text-xs text-on-surface-variant">{monthlyTransactions.length} item</span>
+          </div>
+
+          {monthlyTransactions.length === 0 ? (
+            <p className="text-sm text-on-surface-variant">Belum ada transaksi yang bisa diedit.</p>
+          ) : (
+            <div className="space-y-3">
+              {monthlyTransactions.map((tx) => {
+                const category = categories.find((c) => c.id === tx.categoryId);
+                const isEditing = editingTransactionId === tx.id;
+
+                return (
+                  <div key={tx.id} className="rounded-card border border-surface-high p-3">
+                    {isEditing ? (
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                          <label className="text-xs text-on-surface-variant">
+                            Nominal
+                            <input
+                              type="number"
+                              value={editForm.amount}
+                              onChange={(e) => setEditForm((prev) => ({ ...prev, amount: e.target.value }))}
+                              className="mt-1 w-full rounded-full border border-outline-variant px-3 py-2 text-sm text-on-surface"
+                            />
+                          </label>
+
+                          <label className="text-xs text-on-surface-variant">
+                            Kategori
+                            <select
+                              value={editForm.categoryId}
+                              onChange={(e) => setEditForm((prev) => ({ ...prev, categoryId: e.target.value }))}
+                              className="mt-1 w-full rounded-full border border-outline-variant px-3 py-2 text-sm text-on-surface"
+                            >
+                              {categories.map((cat) => (
+                                <option key={cat.id} value={cat.id}>
+                                  {cat.name}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+
+                          <label className="text-xs text-on-surface-variant md:col-span-2">
+                            Catatan
+                            <input
+                              type="text"
+                              value={editForm.note}
+                              onChange={(e) => setEditForm((prev) => ({ ...prev, note: e.target.value }))}
+                              className="mt-1 w-full rounded-full border border-outline-variant px-3 py-2 text-sm text-on-surface"
+                            />
+                          </label>
+
+                          <label className="text-xs text-on-surface-variant md:col-span-2">
+                            Tanggal
+                            <input
+                              type="date"
+                              value={editForm.date}
+                              onChange={(e) => setEditForm((prev) => ({ ...prev, date: e.target.value }))}
+                              className="mt-1 w-full rounded-full border border-outline-variant px-3 py-2 text-sm text-on-surface"
+                            />
+                          </label>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <button
+                            onClick={saveEdit}
+                            className="rounded-full bg-primary px-3 py-2 text-sm font-semibold text-white"
+                          >
+                            Simpan
+                          </button>
+                          <button
+                            onClick={cancelEdit}
+                            className="rounded-full border border-outline-variant px-3 py-2 text-sm font-semibold text-on-surface"
+                          >
+                            Batal
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="font-semibold text-on-surface">{formatRupiah(tx.amount)}</p>
+                            <span className="rounded-full bg-surface-container px-2 py-1 text-[11px] text-on-surface-variant">
+                              {category?.name || "Lainnya"}
+                            </span>
+                          </div>
+                          {tx.note ? <p className="mt-1 text-sm text-on-surface-variant">{tx.note}</p> : null}
+                          <p className="mt-1 text-xs text-on-surface-variant">
+                            {new Date(tx.date).toLocaleDateString("id-ID", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            })}
+                          </p>
+                        </div>
+
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => startEdit(tx)}
+                            className="flex items-center gap-1 rounded-full border border-outline-variant px-3 py-2 text-sm font-medium text-on-surface"
+                          >
+                            <Pencil size={14} />
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDelete(tx.id)}
+                            className="flex items-center gap-1 rounded-full border border-error/30 px-3 py-2 text-sm font-medium text-error"
+                          >
+                            <Trash2 size={14} />
+                            Hapus
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
       <BottomNav />

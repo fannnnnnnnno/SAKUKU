@@ -10,6 +10,7 @@ import {
 interface TransactionState {
   transactions: Transaction[];
   isLoading: boolean;
+  reset: () => void;
   loadTransactions: () => Promise<void>;
   addTransaction: (tx: Omit<Transaction, "id" | "createdAt">) => Promise<void>;
   updateTransaction: (id: string, tx: Partial<Transaction>) => Promise<void>;
@@ -19,6 +20,8 @@ interface TransactionState {
 export const useTransactionStore = create<TransactionState>((set, get) => ({
   transactions: [],
   isLoading: false,
+
+  reset: () => set({ transactions: [], isLoading: false }),
 
   loadTransactions: async () => {
     set({ isLoading: true });

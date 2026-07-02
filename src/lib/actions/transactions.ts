@@ -4,6 +4,51 @@ import prisma from "@/lib/prisma";
 import { auth } from "@/auth";
 import type { Transaction } from "@/types";
 
+function normalizeTransactionPayload(tx: Partial<Transaction>) {
+  const amount = typeof tx.amount === "number" ? tx.amount : Number(tx.amount);
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error("Jumlah transaksi harus lebih dari 0");
+  }
+
+  const type = tx.type === "income" || tx.type === "expense" ? tx.type : null;
+  if (!type) {
+    throw new Error("Jenis transaksi tidak valid");
+  }
+
+  const categoryId = typeof tx.categoryId === "string" ? tx.categoryId.trim() : "";
+  if (!categoryId) {
+    throw new Error("Kategori wajib dipilih");
+  }
+
+  const note = typeof tx.note === "string" ? tx.note.trim() : "";
+  const dateValue = tx.date ? new Date(tx.date) : new Date();
+  if (Number.isNaN(dateValue.getTime())) {
+    throw new Error("Tanggal tidak valid");
+  }
+
+  const source = tx.source === "scan" || tx.source === "manual" ? tx.source : "manual";
+
+  return {
+    amount,
+    type,
+    categoryId,
+    note: note || null,
+    date: dateValue,
+    source,
+  };
+}
+
+async function ensureCategoryBelongsToUser(userId: string, categoryId: string) {
+  const category = await prisma.category.findFirst({
+    where: { id: categoryId, userId },
+    select: { id: true },
+  });
+
+  if (!category) {
+    throw new Error("Kategori tidak valid untuk akun ini");
+  }
+}
+
 export async function getTransactions(): Promise<Transaction[]> {
   const session = await auth();
   if (!session?.user?.id) return [];
@@ -29,15 +74,18 @@ export async function createTransaction(tx: Omit<Transaction, "id" | "createdAt"
   const session = await auth();
   if (!session?.user?.id) throw new Error("Unauthorized");
 
+  const payload = normalizeTransactionPayload(tx);
+  await ensureCategoryBelongsToUser(session.user.id, payload.categoryId);
+
   return prisma.transaction.create({
     data: {
       userId: session.user.id,
-      amount: tx.amount,
-      type: tx.type,
-      categoryId: tx.categoryId,
-      note: tx.note,
-      date: new Date(tx.date),
-      source: tx.source,
+      amount: payload.amount,
+      type: payload.type,
+      categoryId: payload.categoryId,
+      note: payload.note,
+      date: payload.date,
+      source: payload.source,
     },
   });
 }
@@ -51,15 +99,27 @@ export async function updateTransactionAction(id: string, tx: Partial<Transactio
   });
   if (!existing) throw new Error("Not found");
 
+  const mergedPayload = {
+    amount: tx.amount ?? existing.amount,
+    type: tx.type ?? existing.type,
+    categoryId: tx.categoryId ?? existing.categoryId,
+    note: tx.note ?? existing.note ?? undefined,
+    date: tx.date ?? existing.date.toISOString(),
+    source: tx.source ?? existing.source,
+  } as Partial<Transaction>;
+
+  const payload = normalizeTransactionPayload(mergedPayload);
+  await ensureCategoryBelongsToUser(session.user.id, payload.categoryId);
+
   return prisma.transaction.update({
     where: { id },
     data: {
-      amount: tx.amount,
-      type: tx.type,
-      categoryId: tx.categoryId,
-      note: tx.note,
-      date: tx.date ? new Date(tx.date) : undefined,
-      source: tx.source,
+      amount: payload.amount,
+      type: payload.type,
+      categoryId: payload.categoryId,
+      note: payload.note,
+      date: payload.date,
+      source: payload.source,
     },
   });
 }

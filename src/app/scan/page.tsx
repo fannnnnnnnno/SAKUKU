@@ -1,64 +1,53 @@
 "use client";
 
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, ImageIcon, Camera, Circle } from "lucide-react";
+import { ArrowLeft, ImageIcon, Camera, Circle, AlertCircle } from "lucide-react";
 import { parseReceiptText } from "@/lib/receiptParser";
 
-type ScanState = "idle" | "camera" | "captured";
+type ScanState = "idle" | "camera" | "preview" | "processing" | "error";
 
 export default function ScanStrukScreen() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
 
   const [scanState, setScanState] = useState<ScanState>("idle");
   const [imagePreview, setImagePreview] = useState<string | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
-  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const stopCamera = useCallback(() => {
+    const stream = videoRef.current?.srcObject as MediaStream | null;
+    stream?.getTracks().forEach((t) => t.stop());
+    if (videoRef.current) videoRef.current.srcObject = null;
+  }, []);
 
   useEffect(() => {
-    return () => {
-      stopCamera();
-      if (imagePreview) URL.revokeObjectURL(imagePreview);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [imagePreview]);
+    return () => stopCamera();
+  }, [stopCamera]);
 
-  function stopCamera() {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-    }
-  }
+  const openFilePicker = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
 
-  async function startCamera() {
-    setCameraError(null);
+  const startCamera = useCallback(async () => {
+    setErrorMsg("");
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment" },
+        video: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } },
         audio: false,
       });
-      streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        await videoRef.current.play();
       }
       setScanState("camera");
-    } catch (err: unknown) {
-      const message =
-        err instanceof DOMException
-          ? err.name === "NotAllowedError"
-            ? "Izin kamera ditolak. Izinkan akses kamera di pengaturan browser."
-            : err.name === "NotFoundError"
-              ? "Kamera tidak ditemukan di perangkat ini."
-              : err.message
-          : "Gagal mengakses kamera.";
-      setCameraError(message);
+    } catch {
+      openFilePicker();
     }
-  }
+  }, [openFilePicker]);
 
   function capturePhoto() {
     const video = videoRef.current;
@@ -71,25 +60,66 @@ export default function ScanStrukScreen() {
     if (!ctx) return;
 
     ctx.drawImage(video, 0, 0);
-    const dataUrl = canvas.toDataURL("image/jpeg");
-    setImagePreview(dataUrl);
     stopCamera();
-    setScanState("captured");
-    processImage(dataUrl);
+
+    canvas.toBlob((blob) => {
+      if (!blob) return;
+      const file = new File([blob], "capture.jpg", { type: "image/jpeg" });
+      processImage(file);
+    }, "image/jpeg", 0.85);
   }
 
-  async function processImage(imageSrc: string) {
-    setIsProcessing(true);
+  const compressImage = useCallback((file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const MAX_WIDTH = 1200;
+        const ratio = Math.min(1, MAX_WIDTH / img.width);
+        canvas.width = img.width * ratio;
+        canvas.height = img.height * ratio;
+        ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL("image/jpeg", 0.85));
+      };
+
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject(new Error("Gagal membaca gambar"));
+      };
+
+      img.src = url;
+    });
+  }, []);
+
+  const processImage = useCallback(async (file: File) => {
+    if (!file.type.startsWith("image/")) {
+      setErrorMsg("File harus berupa gambar (JPG, PNG, dll)");
+      setScanState("error");
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      setErrorMsg("Ukuran gambar terlalu besar (maksimal 10MB)");
+      setScanState("error");
+      return;
+    }
+
+    setScanState("preview");
     setProgress(0);
+    setErrorMsg("");
 
     try {
-      const response = await fetch(imageSrc);
-      const blob = await response.blob();
-      const file = new File([blob], "capture.jpg", { type: "image/jpeg" });
+      const compressed = await compressImage(file);
+      setImagePreview(compressed);
+      setScanState("processing");
 
-      const Tesseract = await import("tesseract.js");
+      const { createWorker } = await import("tesseract.js");
 
-      const result = await Tesseract.recognize(file, "ind+eng", {
+      const worker = await createWorker("ind+eng", 1, {
         logger: (m) => {
           if (m.status === "recognizing text") {
             setProgress(Math.round(m.progress * 100));
@@ -97,7 +127,16 @@ export default function ScanStrukScreen() {
         },
       });
 
-      const parsed = parseReceiptText(result.data.text);
+      const { data } = await worker.recognize(compressed);
+      await worker.terminate();
+
+      if (!data.text || data.text.trim().length < 10) {
+        throw new Error(
+          "Teks pada struk tidak terbaca. Coba foto ulang dengan pencahayaan lebih baik."
+        );
+      }
+
+      const parsed = parseReceiptText(data.text);
 
       sessionStorage.setItem(
         "scan-result",
@@ -105,55 +144,62 @@ export default function ScanStrukScreen() {
           merchant: parsed.merchant || "",
           total: parsed.total || 0,
           date: parsed.date || new Date().toISOString(),
-          rawText: result.data.text,
+          rawText: data.text,
         })
       );
 
       router.push("/scan/hasil");
-    } catch {
-      alert("Gagal memproses gambar. Coba lagi atau isi manual.");
-      setIsProcessing(false);
+    } catch (err) {
+      console.error("OCR error:", err);
+      const msg =
+        err instanceof Error ? err.message : "Gagal memproses struk.";
+      setErrorMsg(msg + " Coba lagi atau isi manual.");
+      setScanState("error");
     }
-  }
+  }, [compressImage, router]);
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleFileChange = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      e.target.value = "";
+      await processImage(file);
+    },
+    [processImage]
+  );
 
-    const previewUrl = URL.createObjectURL(file);
-    setImagePreview(previewUrl);
-    setScanState("captured");
-    processImage(previewUrl);
-  };
-
-  function handleBackToIdle() {
+  const handleReset = () => {
     stopCamera();
-    setScanState("idle");
     setImagePreview(null);
-    setCameraError(null);
-  }
+    setScanState("idle");
+    setProgress(0);
+    setErrorMsg("");
+  };
 
   return (
     <main className="min-h-screen bg-black flex flex-col">
       <div className="flex items-center gap-4 px-5 pt-6 pb-4">
-        <button onClick={scanState === "idle" ? () => router.back() : handleBackToIdle}>
+        <button onClick={() => router.back()}>
           <ArrowLeft size={24} color="white" />
         </button>
         <h1 className="text-lg font-bold text-white">Scan Struk</h1>
       </div>
 
-      {/* Viewfinder / Preview */}
-      <div className="flex-1 flex flex-col items-center justify-center px-8">
+      <div className="flex-1 flex flex-col items-center justify-center px-6">
         {scanState === "idle" && (
           <>
-            <div className="w-full aspect-[3/4] max-w-xs border-2 border-white rounded-2xl relative flex items-center justify-center">
+            <div className="w-full max-w-xs aspect-[3/4] border-2 border-white/40 rounded-2xl relative">
               <div className="absolute -top-1 -left-1 w-8 h-8 border-t-4 border-l-4 border-primary-container rounded-tl-2xl" />
               <div className="absolute -top-1 -right-1 w-8 h-8 border-t-4 border-r-4 border-primary-container rounded-tr-2xl" />
               <div className="absolute -bottom-1 -left-1 w-8 h-8 border-b-4 border-l-4 border-primary-container rounded-bl-2xl" />
               <div className="absolute -bottom-1 -right-1 w-8 h-8 border-b-4 border-r-4 border-primary-container rounded-br-2xl" />
-              <Camera size={48} className="text-white/30" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <p className="text-white/50 text-sm text-center px-4">
+                  Arahkan kamera ke struk belanja
+                </p>
+              </div>
             </div>
-            <p className="text-white text-sm mt-4 text-center">
+            <p className="text-white/70 text-sm mt-4 text-center">
               Posisikan struk di dalam kotak
             </p>
           </>
@@ -175,62 +221,112 @@ export default function ScanStrukScreen() {
           </div>
         )}
 
-        {(scanState === "captured" || isProcessing) && imagePreview && (
-          <div className="w-full max-w-xs">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={imagePreview}
-              alt="Preview struk"
-              className="w-full rounded-xl object-contain max-h-96"
-            />
-            {isProcessing && (
-              <div className="mt-6 text-center">
-                <div className="w-8 h-8 border-3 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-3" />
-                <p className="text-white text-sm">Memproses... {progress}%</p>
-              </div>
-            )}
-          </div>
-        )}
+        {(scanState === "preview" || scanState === "processing") &&
+          imagePreview && (
+            <div className="w-full max-w-xs">
+              <img
+                src={imagePreview}
+                alt="Preview struk"
+                className="w-full rounded-xl object-contain max-h-96"
+              />
+              {scanState === "processing" && (
+                <div className="mt-6 text-center">
+                  <div className="w-10 h-10 border-4 border-white/20 border-t-white rounded-full animate-spin mx-auto mb-3" />
+                  <p className="text-white text-sm font-medium">
+                    Memproses... {progress}%
+                  </p>
+                  <p className="text-white/50 text-xs mt-1">
+                    Mohon tunggu, jangan tutup halaman ini
+                  </p>
+                  <div className="mt-3 h-1.5 bg-white/20 rounded-full overflow-hidden max-w-[200px] mx-auto">
+                    <div
+                      className="h-full bg-primary-container rounded-full transition-all duration-300"
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
-        {cameraError && (
-          <p className="text-red-400 text-sm text-center mt-4">{cameraError}</p>
+        {scanState === "error" && (
+          <div className="text-center max-w-xs">
+            <div className="w-16 h-16 rounded-full bg-error/20 flex items-center justify-center mx-auto mb-4">
+              <AlertCircle size={32} color="#FF584F" />
+            </div>
+            <p className="text-white text-sm font-medium mb-2">
+              Gagal Memproses
+            </p>
+            <p className="text-white/60 text-xs mb-6">{errorMsg}</p>
+            <button
+              onClick={handleReset}
+              className="px-6 py-2.5 bg-white/10 text-white text-sm rounded-full border border-white/20"
+            >
+              Coba Lagi
+            </button>
+          </div>
         )}
       </div>
 
       {/* Bottom controls */}
-      <div className="bg-gradient-to-t from-black/60 to-transparent pb-8 pt-6 flex items-center justify-center gap-10">
-        {scanState === "idle" && (
-          <>
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="flex flex-col items-center gap-1"
-            >
-              <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
-                <ImageIcon size={20} color="white" />
-              </div>
-              <span className="text-[10px] text-white">GALERI</span>
-            </button>
+      {scanState === "idle" && (
+        <div className="pb-10 pt-6 flex items-center justify-center gap-12">
+          <button
+            onClick={openFilePicker}
+            className="flex flex-col items-center gap-1.5"
+          >
+            <div className="w-12 h-12 rounded-full bg-white/15 flex items-center justify-center border border-white/20">
+              <ImageIcon size={20} color="white" />
+            </div>
+            <span className="text-[10px] text-white/70 font-medium tracking-wide">
+              GALERI
+            </span>
+          </button>
+          <button
+            onClick={startCamera}
+            className="rounded-full bg-white flex items-center justify-center shadow-lg active:scale-95 transition-transform"
+            style={{ width: 72, height: 72 }}
+          >
+            <Camera size={28} color="black" />
+          </button>
+          <div className="w-12 h-12" />
+        </div>
+      )}
 
-            <button
-              onClick={startCamera}
-              className="w-16 h-16 rounded-full bg-white flex items-center justify-center"
-            >
-              <Camera size={26} color="black" />
-            </button>
-
-            <div className="w-12 h-12" />
-          </>
-        )}
-
-        {scanState === "camera" && !isProcessing && (
+      {scanState === "camera" && (
+        <div className="pb-10 pt-6 flex items-center justify-center">
           <button
             onClick={capturePhoto}
-            className="w-16 h-16 rounded-full border-4 border-white flex items-center justify-center"
+            className="w-16 h-16 rounded-full border-4 border-white flex items-center justify-center active:scale-90 transition-transform"
           >
             <Circle size={36} color="white" fill="white" />
           </button>
-        )}
-      </div>
+        </div>
+      )}
+
+      {scanState === "error" && (
+        <div className="pb-10 pt-6 flex items-center justify-center gap-12">
+          <button
+            onClick={openFilePicker}
+            className="flex flex-col items-center gap-1.5"
+          >
+            <div className="w-12 h-12 rounded-full bg-white/15 flex items-center justify-center border border-white/20">
+              <ImageIcon size={20} color="white" />
+            </div>
+            <span className="text-[10px] text-white/70 font-medium tracking-wide">
+              GALERI
+            </span>
+          </button>
+          <button
+            onClick={startCamera}
+            className="rounded-full bg-white flex items-center justify-center shadow-lg active:scale-95 transition-transform"
+            style={{ width: 72, height: 72 }}
+          >
+            <Camera size={28} color="black" />
+          </button>
+          <div className="w-12 h-12" />
+        </div>
+      )}
 
       <input
         ref={fileInputRef}
@@ -239,7 +335,6 @@ export default function ScanStrukScreen() {
         onChange={handleFileChange}
         className="hidden"
       />
-
       <canvas ref={canvasRef} className="hidden" />
     </main>
   );

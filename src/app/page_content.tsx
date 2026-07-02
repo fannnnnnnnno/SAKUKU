@@ -5,16 +5,17 @@ import { useMemo } from "react";
 import { Bell, Plus, ArrowDownLeft, ArrowUpRight } from "lucide-react";
 import { useTransactionStore } from "@/store/transactionStore";
 import { useCategoryStore } from "@/store/categoryStore";
-import { formatRupiah, formatDateLabel, getMonthRange } from "@/lib/formatters";
+import { formatRupiah, formatDateLabel, formatMonthYear, getMonthRange } from "@/lib/formatters";
 import { CategoryIcon } from "@/components/CategoryIcon";
 import { BottomNav } from "@/components/BottomNav";
 
 export default function DashboardScreen() {
   const transactions = useTransactionStore((s) => s.transactions);
   const getCategoryById = useCategoryStore((s) => s.getCategoryById);
+  const currentMonth = useMemo(() => new Date(), []);
 
   const summary = useMemo(() => {
-    const { start, end } = getMonthRange(new Date());
+    const { start, end } = getMonthRange(currentMonth);
     const thisMonth = transactions.filter((t) => {
       const d = new Date(t.date);
       return d >= start && d <= end;
@@ -27,10 +28,10 @@ export default function DashboardScreen() {
       .filter((t) => t.type === "expense")
       .reduce((sum, t) => sum + t.amount, 0);
 
-    return { income, expense, balance: income - expense };
-  }, [transactions]);
+    return { income, expense, balance: income - expense, thisMonth };
+  }, [currentMonth, transactions]);
 
-  const recentTransactions = transactions.slice(0, 4);
+  const recentTransactions = summary.thisMonth.slice(0, 4);
 
   return (
     <main className="min-h-screen bg-surface pb-24 md:pb-10">
@@ -55,9 +56,14 @@ export default function DashboardScreen() {
             }}
           >
             <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-white/10" />
-            <p className="text-xs font-medium uppercase tracking-wide opacity-90">
-              Saldo Bulan Ini
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-medium uppercase tracking-wide opacity-90">
+                Saldo {formatMonthYear(currentMonth)}
+              </p>
+              <span className="rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em]">
+                Reset otomatis per bulan
+              </span>
+            </div>
             <p className="text-3xl md:text-4xl font-bold mt-1">
               {formatRupiah(summary.balance)}
             </p>
@@ -111,7 +117,7 @@ export default function DashboardScreen() {
           <div className="space-y-2">
             {recentTransactions.length === 0 && (
               <p className="text-sm text-on-surface-variant text-center py-8">
-                Belum ada transaksi. Tambahkan transaksi pertamamu!
+                Belum ada transaksi untuk {formatMonthYear(currentMonth)}. Tambahkan transaksi pertamamu!
               </p>
             )}
             {recentTransactions.map((tx) => {

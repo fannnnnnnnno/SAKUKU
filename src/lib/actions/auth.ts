@@ -6,10 +6,14 @@ import { signIn } from "@/auth";
 import { AuthError } from "next-auth";
 import crypto from "crypto";
 
+function normalizeEmail(email: string) {
+  return email.trim().toLowerCase();
+}
+
 export async function registerUser(prevState: any, formData: FormData) {
-  const name = formData.get("name") as string;
-  const email = formData.get("email") as string;
-  const password = formData.get("password") as string;
+  const name = (formData.get("name") as string | null)?.trim() ?? "";
+  const email = normalizeEmail((formData.get("email") as string | null) ?? "");
+  const password = (formData.get("password") as string | null) ?? "";
 
   if (!name || !email || !password) {
     return { error: "Semua bidang harus diisi" };
@@ -66,7 +70,7 @@ export async function registerUser(prevState: any, formData: FormData) {
     await signIn("credentials", {
       email,
       password,
-      redirectTo: "/",
+      redirect: false,
     });
   } catch (error) {
     if (error instanceof Error && (error as any).digest?.startsWith("NEXT_REDIRECT")) {
@@ -74,22 +78,30 @@ export async function registerUser(prevState: any, formData: FormData) {
     }
     return { error: "Pendaftaran berhasil, tetapi gagal masuk otomatis. Silakan masuk manual." };
   }
+
+  return { success: true };
 }
 
 export async function loginUser(prevState: any, formData: FormData) {
-  const email = formData.get("email") as string;
-  const password = formData.get("password") as string;
+  const email = normalizeEmail((formData.get("email") as string | null) ?? "");
+  const password = (formData.get("password") as string | null) ?? "";
 
   if (!email || !password) {
     return { error: "Email dan password harus diisi" };
   }
 
   try {
-    await signIn("credentials", {
+    const result = await signIn("credentials", {
       email,
       password,
-      redirectTo: "/",
+      redirect: false,
     });
+
+    if (result?.error) {
+      return { error: "Email atau password salah." };
+    }
+
+    return { success: true };
   } catch (error) {
     if (error instanceof Error && (error as any).digest?.startsWith("NEXT_REDIRECT")) {
       throw error;
