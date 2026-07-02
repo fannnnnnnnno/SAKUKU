@@ -15,13 +15,13 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (status === "authenticated") {
-      const callbackUrl = searchParams.get("callbackUrl") || "/transaksi";
+      const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
       router.replace(callbackUrl);
       return;
     }
 
     if (state?.success) {
-      const callbackUrl = searchParams.get("callbackUrl") || "/transaksi";
+      const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
       router.replace(callbackUrl);
     }
   }, [router, searchParams, state?.success, status]);
