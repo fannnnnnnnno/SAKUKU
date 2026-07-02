@@ -14,12 +14,12 @@ export default function RegisterPage() {
 
   useEffect(() => {
     if (status === "authenticated") {
-      router.replace("/transaksi");
+      router.replace("/dashboard");
       return;
     }
 
     if (state?.success) {
-      router.replace("/transaksi");
+      router.replace("/dashboard");
     }
   }, [router, state?.success, status]);
 
@@ -48,7 +48,7 @@ export default function RegisterPage() {
             {/* Nama Lengkap */}
             <div>
               <label className="text-xs font-semibold text-on-surface-variant block mb-1.5">
-                Nama Lengkap
+                Username
               </label>
               <div className="flex items-center gap-3 border border-outline-variant rounded-card px-4 py-3 bg-surface focus-within:border-primary transition-colors">
                 <User size={18} className="text-on-surface-variant" />
