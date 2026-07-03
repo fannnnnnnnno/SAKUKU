@@ -15,7 +15,7 @@ const inter = localFont({
 
 export const metadata: Metadata = {
   title: "SAKUKU - Pencatat Pengeluaran",
-  description: "Aplikasi pencatat pengeluaran bulanan, ringan dan offline-first",
+  description: "Aplikasi pencatat pengeluaran bulanan, ringan dan mudah dipakai",
   manifest: "/manifest.json",
 };
 
@@ -24,7 +24,6 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  viewportFit: "cover",
 };
 
 export default async function RootLayout({
@@ -32,18 +31,21 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Ambil session di server — ini yang bikin sidebar langsung tampil
+  // tanpa perlu nunggu client-side session fetch
   const session = await auth();
-  const isAuthenticated = !!session?.user;
 
   return (
-    <html lang="id" className="h-full">
-      <body className={`${inter.variable} font-sans antialiased min-h-screen h-full bg-surface text-on-surface`}>
-        <SessionProvider>
+    <html lang="id" suppressHydrationWarning>
+      <body className={`${inter.variable} font-sans antialiased`}>
+        {/* Pass session awal dari server ke SessionProvider */}
+        <SessionProvider session={session}>
           <DataProvider>
-            {isAuthenticated && <Sidebar />}
-            <div className={isAuthenticated ? "md:pl-60" : ""}>
-              <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-0 sm:px-4 md:px-6 lg:px-8">
-                <div className="relative flex-1">{children}</div>
+            {/* Sidebar render di server dengan session awal — tidak perlu tunggu client */}
+            <Sidebar />
+            <div className="md:pl-60">
+              <div className="max-w-md md:max-w-4xl mx-auto relative">
+                {children}
               </div>
             </div>
           </DataProvider>
