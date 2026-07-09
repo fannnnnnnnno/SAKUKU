@@ -46,6 +46,9 @@ export const authConfig = {
         if (isLoggedIn && pathname === "/") {
           return Response.redirect(new URL("/transaksi", nextUrl));
         }
+        if (isLoggedIn && (pathname === "/login" || pathname === "/register")) {
+          return Response.redirect(new URL("/dashboard", nextUrl));
+        }
         return true;
       }
 

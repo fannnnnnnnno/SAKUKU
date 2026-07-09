@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { Home, Receipt, ScanLine, PieChart, Settings } from "lucide-react";
 
 const navItems = [
-  { href: "/", label: "Home", icon: Home },
+  { href: "/dashboard", label: "Home", icon: Home },
   { href: "/transaksi", label: "Transaksi", icon: Receipt },
   { href: "/scan", label: "Scan", icon: ScanLine, isCenter: true },
   { href: "/laporan", label: "Laporan", icon: PieChart },
@@ -18,7 +18,7 @@ export function BottomNav() {
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-surface-lowest border-t border-surface-high px-2 py-2 flex items-center justify-around z-20">
       {navItems.map(({ href, label, icon: Icon, isCenter }) => {
-        const isActive = pathname === href;
+        const isActive = pathname === href || (href === "/dashboard" && pathname === "/");
 
         if (isCenter) {
           return (

@@ -9,6 +9,7 @@ const nextConfig: NextConfig = {
         "localhost:3000",
         "127.0.0.1:3000",
         "*.asse.devtunnels.ms",
+        "sakuku.mchralf.my.id",
         // Tambahkan domain production saat deploy ke Vercel/hosting
         ...(process.env.ALLOWED_ORIGINS
           ? process.env.ALLOWED_ORIGINS.split(",").map((s) => s.trim())

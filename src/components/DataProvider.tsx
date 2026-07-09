@@ -17,25 +17,28 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     if (status === "loading") return;
 
     const userId = session?.user?.id ?? null;
+    const prevUserId = requestIdRef.current;
 
-    if (!userId) {
-      requestIdRef.current += 1;
+    // Hanya reset kalau benar-benar logout (userId berubah dari ada → null)
+    if (!userId && prevUserId !== 0) {
+      requestIdRef.current = 0;
       resetTransactions();
       resetCategories();
       return;
     }
 
-    const activeRequestId = ++requestIdRef.current;
-    resetTransactions();
-    resetCategories();
+    if (!userId) {
+      requestIdRef.current = 0;
+      return;
+    }
+
+    requestIdRef.current = userId;
 
     const syncUserData = async () => {
       try {
         await Promise.all([loadCategories(), loadTransactions()]);
       } catch (error) {
-        if (activeRequestId === requestIdRef.current) {
-          console.error("Gagal menyinkronkan data pengguna:", error);
-        }
+        console.error("Gagal menyinkronkan data pengguna:", error);
       }
     };
 

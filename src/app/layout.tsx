@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import { DataProvider } from "@/components/DataProvider";
-import { Sidebar } from "@/components/Sidebar";
+import { AppShell } from "@/components/AppShell";
 import { SessionProvider } from "next-auth/react";
 import { auth } from "@/auth";
 
@@ -38,16 +38,9 @@ export default async function RootLayout({
   return (
     <html lang="id" suppressHydrationWarning>
       <body className={`${inter.variable} font-sans antialiased`}>
-        {/* Pass session awal dari server ke SessionProvider */}
         <SessionProvider session={session}>
           <DataProvider>
-            {/* Sidebar render di server dengan session awal — tidak perlu tunggu client */}
-            <Sidebar />
-            <div className="md:pl-60">
-              <div className="max-w-md md:max-w-4xl mx-auto relative">
-                {children}
-              </div>
-            </div>
+            <AppShell>{children}</AppShell>
           </DataProvider>
         </SessionProvider>
       </body>

@@ -21,14 +21,15 @@ export function Sidebar() {
   // Sidebar selalu tampil — session hanya untuk info user di bawah
   const { data: session, status } = useSession();
 
-  // Sembunyikan sidebar di halaman auth
-  const isAuthPage =
+  // Sembunyikan sidebar di halaman auth dan landing page
+  const hideSidebar =
+    pathname === "/" ||
     pathname?.startsWith("/login") ||
     pathname?.startsWith("/register") ||
     pathname?.startsWith("/forgot-password") ||
     pathname?.startsWith("/reset-password");
 
-  if (isAuthPage) return null;
+  if (hideSidebar) return null;
 
   return (
     <aside className="hidden md:flex flex-col w-60 fixed left-0 top-0 h-screen bg-surface-lowest border-r border-surface-high px-4 py-6 z-30">
@@ -43,9 +44,7 @@ export function Sidebar() {
       {/* Nav Items — selalu tampil */}
       <nav className="flex flex-col gap-1">
         {navItems.map(({ href, label, icon: Icon }) => {
-          const isActive =
-          pathname === href ||
-          (href === "/dashboard" && pathname === "/");
+          const isActive = pathname === href;
           return (
             <Link
               key={href}
@@ -93,7 +92,7 @@ export function Sidebar() {
                 </p>
               </div>
               <button
-                onClick={() => signOut({ callbackUrl: "/login" })}
+                onClick={() => signOut({ callbackUrl: "/" })}
                 className="w-full flex items-center gap-3 px-3 py-2.5 rounded-card text-sm font-medium text-error hover:bg-error-container/30 transition-colors"
               >
                 <LogOut size={18} />

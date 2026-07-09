@@ -157,7 +157,7 @@ export default function DashboardScreen() {
       {/* FAB - mobile only, desktop uses sidebar button */}
       <Link
         href="/tambah"
-        className="md:hidden fixed bottom-24 right-5 w-14 h-14 rounded-full bg-primary-container flex items-center justify-center shadow-lg max-w-md"
+        className="md:hidden fixed bottom-28 right-5 z-30 w-14 h-14 rounded-full bg-primary-container flex items-center justify-center shadow-lg"
       >
         <Plus size={28} color="white" />
       </Link>

@@ -13,7 +13,7 @@ export default function RegisterPage() {
   const { status } = useSession();
 
   useEffect(() => {
-    if (status === "authenticated") {
+    if (status === "authenticated" && !state?.success) {
       router.replace("/dashboard");
       return;
     }

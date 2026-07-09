@@ -60,7 +60,7 @@ export default function HasilScanScreen() {
     });
 
     sessionStorage.removeItem("scan-result");
-    router.push("/");
+    router.push("/dashboard");
   };
 
   return (

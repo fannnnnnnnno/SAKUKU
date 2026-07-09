@@ -56,7 +56,7 @@ export default function TambahTransaksiScreen() {
         source: "manual",
       });
 
-      router.push("/");
+      router.push("/dashboard");
     } catch {
       setError("Gagal menyimpan transaksi");
       setIsSubmitting(false);

@@ -14,7 +14,7 @@ export default function LoginPage() {
   const { status } = useSession();
 
   useEffect(() => {
-    if (status === "authenticated") {
+    if (status === "authenticated" && !state?.success) {
       const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
       router.replace(callbackUrl);
       return;
