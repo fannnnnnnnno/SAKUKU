@@ -22,6 +22,7 @@ const nextConfig: NextConfig = {
     "127.0.0.1",
     "0.0.0.0",
     "*.asse.devtunnels.ms",
+    "sakuku.mchralf.my.id",
   ],
   images: {
     formats: ["image/avif", "image/webp"],

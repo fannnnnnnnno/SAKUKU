@@ -29,7 +29,7 @@ async function sendResetEmail(to: string, resetUrl: string) {
   const resend = new Resend(apiKey);
 
   await resend.emails.send({
-    from: "SAKUKU <onboarding@resend.dev>",
+    from: "SAKUKU <noreply@mchralf.my.id>",
     to,
     subject: "Reset Password SAKUKU",
     html: `
